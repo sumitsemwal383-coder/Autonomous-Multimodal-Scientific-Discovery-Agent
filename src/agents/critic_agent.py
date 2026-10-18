@@ -1,6 +1,7 @@
 from typing import Dict, Any
-from scipy import stats
+
 import numpy as np
+from scipy import stats
 
 from .base_agent import BaseAgent
 from config.settings import STATISTICAL_ALPHA_DEFAULT
@@ -14,8 +15,8 @@ class CriticAgent(BaseAgent):
             name="Empirical Statistical Critic",
             role="Statistical Critic Agent",
             description=(
-                "Evaluates statistical significance and "
-                "standardized effect sizes."
+                "Evaluates statistical significance, effect sizes, "
+                "and confidence intervals for treatment gains."
             )
         )
 
@@ -23,13 +24,17 @@ class CriticAgent(BaseAgent):
 
     def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Perform a two-tailed one-sample t-test and calculate Cohen's d.
+        Perform a two-tailed one-sample t-test, calculate Cohen's d,
+        and compute the confidence interval for mean treatment gain.
 
         Expected inputs:
-            differences: list of paired treatment-minus-baseline differences
+            differences: paired treatment-minus-baseline differences
         """
 
-        differences = np.asarray(inputs.get("differences", []), dtype=float)
+        differences = np.asarray(
+            inputs.get("differences", []),
+            dtype=float
+        )
 
         # Validate input data
         if (
@@ -44,6 +49,10 @@ class CriticAgent(BaseAgent):
                 )
             }
 
+        sample_size = len(differences)
+        mean_difference = float(np.mean(differences))
+        std_difference = float(np.std(differences, ddof=1))
+
         # Two-tailed Student's t-test
         t_statistic, p_value = stats.ttest_1samp(
             differences,
@@ -51,10 +60,7 @@ class CriticAgent(BaseAgent):
             alternative="two-sided"
         )
 
-        # Standardized Cohen's d for paired differences (d_z)
-        mean_difference = np.mean(differences)
-        std_difference = np.std(differences, ddof=1)
-
+        # Cohen's dz effect size
         if std_difference == 0:
             cohens_d = (
                 float("inf") if mean_difference > 0
@@ -64,7 +70,7 @@ class CriticAgent(BaseAgent):
         else:
             cohens_d = mean_difference / std_difference
 
-        # Interpret the absolute effect size
+        # Classify effect size
         magnitude = abs(cohens_d)
 
         if magnitude < 0.2:
@@ -76,13 +82,26 @@ class CriticAgent(BaseAgent):
         else:
             effect_magnitude = "Large"
 
-        is_significant = p_value < self.alpha
+        # Compute the 95% confidence interval for the mean gain
+        standard_error = stats.sem(differences)
+        confidence_level = 0.95
+
+        ci_low, ci_high = stats.t.interval(
+            confidence_level,
+            df=sample_size - 1,
+            loc=mean_difference,
+            scale=standard_error
+        )
+
+        # Determine statistical significance
+        is_significant = bool(p_value < self.alpha)
 
         self.log_action(
             "STATISTICAL_ANALYSIS",
             (
                 f"t={t_statistic:.4f}, p={p_value:.6f}, "
-                f"Cohen's d={cohens_d:.4f}"
+                f"Cohen's d={cohens_d:.4f}, "
+                f"95% CI=[{ci_low:.4f}, {ci_high:.4f}]"
             )
         )
 
@@ -94,9 +113,14 @@ class CriticAgent(BaseAgent):
             "t_statistic": float(t_statistic),
             "p_value": float(p_value),
             "alpha": self.alpha,
-            "is_significant": bool(is_significant),
+            "is_significant": is_significant,
             "cohens_d": float(cohens_d),
             "effect_magnitude": effect_magnitude,
-            "mean_difference": float(mean_difference),
-            "sample_size": len(differences)
+            "mean_difference": mean_difference,
+            "sample_size": sample_size,
+            "confidence_level": confidence_level,
+            "ci_95_low": float(ci_low),
+            "ci_95_high": float(ci_high),
+            "ci_95": [float(ci_low), float(ci_high)],
+            "ci_excludes_zero": bool(ci_low > 0 or ci_high < 0)
         }
