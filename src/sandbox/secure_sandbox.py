@@ -38,3 +38,59 @@ class ASTSecurityValidator(ast.NodeVisitor):
                 self.is_breakout = True
 
         self.generic_visit(node)
+      
+    def visit_Call(self, node):
+        dangerous_functions = {
+            "eval", "exec", "compile", "__import__",
+            "breakpoint", "exit", "quit"
+        }
+
+        if (
+            isinstance(node.func, ast.Name)
+            and node.func.id in dangerous_functions
+         ):
+            self.violations.append(
+                f"Unsafe function call: {node.func.id}()"
+            )
+            self.is_breakout = True
+
+        # Detect obvious suspicious constant file paths.
+        if (
+            isinstance(node.func, ast.Name)
+            and node.func.id == "open"
+            and node.args
+            and isinstance(node.args[0], ast.Constant)
+            and isinstance(node.args[0].value, str)
+        ):
+            path = node.args[0].value.lower()
+            suspicious_parts = [
+                "..", ".ssh", "system32", "/etc/", "root"
+            ]
+
+            if any(part in path for part in suspicious_parts):
+                self.violations.append(
+                    f"Suspicious file path: {node.args[0].value}"
+                )
+                self.is_breakout = True
+
+        self.generic_visit(node)
+
+
+def validate_code(code_str):
+    """Parse and statically validate Python source code."""
+    try:
+        tree = ast.parse(code_str)
+    except SyntaxError as error:
+        return False, f"Syntax error: {error}", False
+
+    validator = ASTSecurityValidator()
+    validator.visit(tree)
+
+    if validator.violations:
+        return (
+            False,
+            "; ".join(validator.violations),
+            validator.is_breakout,
+        )
+
+    return True, None, False
