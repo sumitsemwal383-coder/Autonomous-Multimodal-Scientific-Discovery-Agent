@@ -94,3 +94,21 @@ def validate_code(code_str):
         )
 
     return True, None, False
+def visit_Attribute(self, node):
+        dangerous_attributes = {
+            "__class__",
+            "__base__",
+            "__bases__",
+            "__subclasses__",
+            "__globals__",
+            "__builtins__",
+            "__import__",
+        }
+
+        if node.attr in dangerous_attributes:
+            self.violations.append(
+                f"Reflective access blocked: {node.attr}"
+            )
+            self.is_breakout = True
+
+        self.generic_visit(node)
