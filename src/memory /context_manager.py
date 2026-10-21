@@ -70,6 +70,7 @@ class ContextMemoryManager:
             else 0.0
         )
 
+        
         return {
             "total_tokens_consumed": self.total_tokens_consumed,
             "active_context_tokens": active_tokens,
