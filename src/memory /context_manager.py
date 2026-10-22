@@ -1,27 +1,27 @@
-
-"""
-Context Memory Manager
-
-Implements episodic context storage and heuristic token estimation
-for tracking interactions between agents.
-"""
-
 import logging
 from typing import List, Dict, Any, Optional
 
-from config.settings import MAX_CONTEXT_TOKENS
+from config.settings import MAX_CONTEXT_TOKENS, SLIDING_WINDOW_HISTORY
 
 logger = logging.getLogger(__name__)
 
 
 class ContextMemoryManager:
-    """Manages working memory and episodic interaction history."""
+    """Manages episodic memory and recent interaction history."""
 
     def __init__(
         self,
-        max_tokens: int = MAX_CONTEXT_TOKENS
+        max_tokens: int = MAX_CONTEXT_TOKENS,
+        sliding_window_size: int = SLIDING_WINDOW_HISTORY
     ):
+        if max_tokens <= 0:
+            raise ValueError("max_tokens must be greater than zero.")
+
+        if sliding_window_size <= 0:
+            raise ValueError("sliding_window_size must be greater than zero.")
+
         self.max_tokens = max_tokens
+        self.sliding_window_size = sliding_window_size
 
         # Memory stores
         self.working_memory: Dict[str, Any] = {}
@@ -29,10 +29,7 @@ class ContextMemoryManager:
         self.total_tokens_consumed = 0
 
     def estimate_tokens(self, text: str) -> int:
-        """
-        Estimate token usage using approximately four characters per token.
-        This is a heuristic, not an exact tokenizer.
-        """
+        """Estimate token usage using approximately four characters per token."""
         return max(1, len(text) // 4)
 
     def add_interaction(
@@ -42,10 +39,8 @@ class ContextMemoryManager:
         content: str,
         metadata: Optional[Dict[str, Any]] = None
     ) -> None:
-        """
-        Record an agent interaction in episodic memory and track its
-        estimated token consumption.
-        """
+        """Record an interaction and retain only the latest episodes."""
+
         token_cost = self.estimate_tokens(content)
         self.total_tokens_consumed += token_cost
 
@@ -59,6 +54,21 @@ class ContextMemoryManager:
 
         self.episodic_history.append(entry)
 
+        # Day 9: Retain only the most recent interactions
+        if len(self.episodic_history) > self.sliding_window_size:
+            removed_count = (
+                len(self.episodic_history) - self.sliding_window_size
+            )
+
+            self.episodic_history = self.episodic_history[
+                -self.sliding_window_size:
+            ]
+
+            logger.info(
+                "Sliding window applied: removed %d old episodes.",
+                removed_count
+            )
+
         logger.info(
             "Interaction recorded: role=%s, action=%s, tokens=%d",
             agent_role,
@@ -66,16 +76,19 @@ class ContextMemoryManager:
             token_cost
         )
 
+    def get_recent_history(self) -> List[Dict[str, Any]]:
+        """Return the currently retained recent interactions."""
+        return list(self.episodic_history)
+
     def get_token_metrics(self) -> Dict[str, Any]:
-        """Return basic token usage and episodic memory metrics."""
+        """Return token usage and active memory metrics."""
+
         active_tokens = sum(
             entry["tokens"] for entry in self.episodic_history
         )
 
         utilization = (
             (active_tokens / self.max_tokens) * 100
-            if self.max_tokens > 0
-            else 0.0
         )
 
         return {
@@ -83,5 +96,6 @@ class ContextMemoryManager:
             "active_context_tokens": active_tokens,
             "max_context_tokens": self.max_tokens,
             "utilization_pct": round(utilization, 2),
-            "episodes_retained": len(self.episodic_history)
+            "episodes_retained": len(self.episodic_history),
+            "sliding_window_size": self.sliding_window_size
         }
