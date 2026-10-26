@@ -1,5 +1,9 @@
 from pathlib import Path
+
 from typing import Dict, Any, List
+
+from typing import Dict, Any
+
 
 import jinja2
 
@@ -7,7 +11,10 @@ from config.settings import TEMPLATES_DIR, SYNTHESIS_DIR
 
 
 class LatexPaperGenerator:
+
     """Render academic manuscripts and compile BibTeX references."""
+
+    """Render academic manuscripts using LaTeX and Jinja2."""
 
     def __init__(
         self,
@@ -36,6 +43,7 @@ class LatexPaperGenerator:
         output_path = self.output_dir / "research_paper.tex"
         output_path.write_text(content, encoding="utf-8")
         return str(output_path)
+
 
     @staticmethod
     def _escape_bibtex(value: str) -> str:
@@ -108,3 +116,4 @@ class LatexPaperGenerator:
         bib_path.write_text(bib_content, encoding="utf-8")
 
         return str(bib_path)
+
