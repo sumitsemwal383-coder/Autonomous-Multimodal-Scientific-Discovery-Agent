@@ -1,41 +1,57 @@
-import logging
-from pathlib import Path
-from typing import Dict, Any
 
-logger = logging.getLogger(__name__)
+    def extract_loss_trend(
+        self,
+        data_points: list
+    ) -> Dict[str, Any]:
+        """Summarize supplied training-step and loss measurements."""
+        if len(data_points) < 2:
+            return {
+                "error": "At least two loss measurements are required."
+            }
 
+        try:
+            points = sorted(
+                [
+                    {
+                        "step": float(point["step"]),
+                        "loss": float(point["loss"])
+                    }
+                    for point in data_points
+                ],
+                key=lambda point: point["step"]
+            )
+        except (KeyError, TypeError, ValueError):
+            return {"error": "Each point needs numeric step and loss values."}
 
-class MultimodalParser:
-    def __init__(self, vision_model: str = "heuristic_vlm"):
-        self.vision_model = vision_model
+        if any(point["loss"] < 0 for point in points):
+            return {"error": "Loss values cannot be negative."}
 
-    def parse_figure(self, image_path: Path) -> Dict[str, Any]:
-        """Classify a figure using basic filename heuristics."""
-        image_path = Path(image_path)
+        first_loss = points[0]["loss"]
+        last_loss = points[-1]["loss"]
 
-        if not image_path.is_file():
-            return {"error": f"Figure file not found: {image_path}"}
-
-        supported_extensions = {".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff"}
-
-        if image_path.suffix.lower() not in supported_extensions:
-            return {"error": "Unsupported image format"}
-
-        filename = image_path.stem.lower()
-
-        if any(word in filename for word in ("ablation", "bar", "comparison")):
-            figure_type = "Comparative Bar Chart"
-        elif any(word in filename for word in ("loss", "convergence", "training")):
-            figure_type = "Optimization Curve"
-        elif any(word in filename for word in ("architecture", "workflow", "diagram")):
-            figure_type = "Architecture Diagram"
+        if first_loss > 0:
+            reduction_percent = (
+                (first_loss - last_loss) / first_loss
+            ) * 100
         else:
-            figure_type = "Unknown Figure"
+            reduction_percent = None
+
+        if last_loss < first_loss:
+            trend = "decreasing"
+        elif last_loss > first_loss:
+            trend = "increasing"
+        else:
+            trend = "unchanged"
 
         return {
-            "figure_id": image_path.stem,
-            "image_path": str(image_path),
-            "figure_type": figure_type,
-            "classifier": "filename_heuristic",
-            "requires_visual_analysis": True
+            "figure_type": "Optimization Curve",
+            "data_points": points,
+            "initial_loss": first_loss,
+            "final_loss": last_loss,
+            "loss_reduction_percent": (
+                round(reduction_percent, 2)
+                if reduction_percent is not None else None
+            ),
+            "overall_trend": trend,
+            "data_origin": "provided_measurements"
         }
