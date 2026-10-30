@@ -1,4 +1,3 @@
-
     def parse_comparative_chart(
         self,
         data_points: list
