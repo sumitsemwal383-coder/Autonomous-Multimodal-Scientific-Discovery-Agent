@@ -1,57 +1,65 @@
 
-    def extract_loss_trend(
+    def parse_comparative_chart(
         self,
         data_points: list
     ) -> Dict[str, Any]:
-        """Summarize supplied training-step and loss measurements."""
-        if len(data_points) < 2:
-            return {
-                "error": "At least two loss measurements are required."
-            }
+        """Validate comparative measurements and confidence intervals."""
+        if not data_points:
+            return {"error": "No chart measurements provided."}
+
+        validated = []
 
         try:
-            points = sorted(
-                [
-                    {
-                        "step": float(point["step"]),
-                        "loss": float(point["loss"])
+            for point in data_points:
+                label = str(point["label"]).strip()
+                value = float(point["value"])
+
+                if not label:
+                    return {"error": "Every data point needs a label."}
+
+                item = {"label": label, "value": value}
+
+                low = point.get("ci_low")
+                high = point.get("ci_high")
+
+                if (low is None) != (high is None):
+                    return {
+                        "error": f"Incomplete confidence bounds for {label}."
                     }
-                    for point in data_points
-                ],
-                key=lambda point: point["step"]
-            )
+
+                if low is not None:
+                    low = float(low)
+                    high = float(high)
+
+                    if low > high:
+                        return {
+                            "error": f"Invalid confidence bounds for {label}."
+                        }
+
+                    if not low <= value <= high:
+                        return {
+                            "error": (
+                                f"Value for {label} falls outside "
+                                "its supplied confidence bounds."
+                            )
+                        }
+
+                    item["ci_low"] = low
+                    item["ci_high"] = high
+
+                validated.append(item)
+
         except (KeyError, TypeError, ValueError):
-            return {"error": "Each point needs numeric step and loss values."}
+            return {
+                "error": "Each chart point needs a label and numeric value."
+            }
 
-        if any(point["loss"] < 0 for point in points):
-            return {"error": "Loss values cannot be negative."}
-
-        first_loss = points[0]["loss"]
-        last_loss = points[-1]["loss"]
-
-        if first_loss > 0:
-            reduction_percent = (
-                (first_loss - last_loss) / first_loss
-            ) * 100
-        else:
-            reduction_percent = None
-
-        if last_loss < first_loss:
-            trend = "decreasing"
-        elif last_loss > first_loss:
-            trend = "increasing"
-        else:
-            trend = "unchanged"
+        best = max(validated, key=lambda item: item["value"])
 
         return {
-            "figure_type": "Optimization Curve",
-            "data_points": points,
-            "initial_loss": first_loss,
-            "final_loss": last_loss,
-            "loss_reduction_percent": (
-                round(reduction_percent, 2)
-                if reduction_percent is not None else None
-            ),
-            "overall_trend": trend,
+            "figure_type": "Comparative Bar Chart",
+            "key_data_points": validated,
+            "highest_value_method": best["label"],
+            "highest_value": best["value"],
             "data_origin": "provided_measurements"
         }
