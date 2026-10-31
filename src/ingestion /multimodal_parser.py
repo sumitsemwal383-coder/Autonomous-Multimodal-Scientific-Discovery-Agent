@@ -1,64 +1,54 @@
-    def parse_comparative_chart(
+
+    def synthesize_visual_chunks(
         self,
-        data_points: list
-    ) -> Dict[str, Any]:
-        """Validate comparative measurements and confidence intervals."""
-        if not data_points:
-            return {"error": "No chart measurements provided."}
+        figures: list,
+        paper_metadata: Dict[str, Any] = None
+    ) -> list:
+        """Convert extracted figure evidence into searchable text chunks."""
+        paper_metadata = paper_metadata or {}
+        chunks = []
 
-        validated = []
+        for index, figure in enumerate(figures, start=1):
+            figure_id = figure.get("figure_id", f"Fig_{index}")
+            caption = figure.get("caption", "")
+            figure_type = figure.get("type", figure.get("figure_type", "Unknown"))
+            interpretation = figure.get("interpretation", "")
+            summary = figure.get("quantitative_summary", "")
 
-        try:
-            for point in data_points:
-                label = str(point["label"]).strip()
-                value = float(point["value"])
+            data_points = figure.get(
+                "key_data_points",
+                figure.get("data_points", [])
+            )
 
-                if not label:
-                    return {"error": "Every data point needs a label."}
+            if not any([caption, interpretation, summary, data_points]):
+                continue
 
-                item = {"label": label, "value": value}
+            point_text = "; ".join(
+                str(point) for point in data_points
+            )
 
-                low = point.get("ci_low")
-                high = point.get("ci_high")
+            text = (
+                f"Figure ID: {figure_id}\n"
+                f"Figure type: {figure_type}\n"
+                f"Caption: {caption}\n"
+                f"Interpretation: {interpretation}\n"
+                f"Quantitative summary: {summary}\n"
+                f"Data points: {point_text}"
+            )
 
-                if (low is None) != (high is None):
-                    return {
-                        "error": f"Incomplete confidence bounds for {label}."
-                    }
+            chunks.append({
+                "id": (
+                    f"{paper_metadata.get('id', 'unknown_paper')}"
+                    f"_{figure_id}"
+                ),
+                "text": text,
+                "metadata": {
+                    **paper_metadata,
+                    "figure_id": figure_id,
+                    "figure_type": figure_type,
+                    "caption": caption,
+                    "content_type": "visual_evidence"
+                }
+            })
 
-                if low is not None:
-                    low = float(low)
-                    high = float(high)
-
-                    if low > high:
-                        return {
-                            "error": f"Invalid confidence bounds for {label}."
-                        }
-
-                    if not low <= value <= high:
-                        return {
-                            "error": (
-                                f"Value for {label} falls outside "
-                                "its supplied confidence bounds."
-                            )
-                        }
-
-                    item["ci_low"] = low
-                    item["ci_high"] = high
-
-                validated.append(item)
-
-        except (KeyError, TypeError, ValueError):
-            return {
-                "error": "Each chart point needs a label and numeric value."
-            }
-
-        best = max(validated, key=lambda item: item["value"])
-
-        return {
-            "figure_type": "Comparative Bar Chart",
-            "key_data_points": validated,
-            "highest_value_method": best["label"],
-            "highest_value": best["value"],
-            "data_origin": "provided_measurements"
-        }
+        return chunks
