@@ -29,3 +29,21 @@ class ScientificDiscoveryOrchestrator:
         self.multimodal_parser = MultimodalParser()
         self.reward_model = DiscoveryRewardModel()
         self.latex_generator = LatexPaperGenerator()
+     # 2. Execution Sandbox
+        if use_docker:
+            self.sandbox = DockerSandbox()
+        else:
+            self.sandbox = SecureSandbox()
+
+        # 3. RL Feedback Loop
+        self.feedback_loop = SelfDebuggingFeedbackLoop(max_iterations=max_debug_iterations)
+
+        # 4. Specialized Agents
+        self.reviewer_agent = LiteratureReviewerAgent(self.vector_db)
+        self.hypothesis_agent = HypothesisGeneratorAgent(self.retriever)
+        self.code_agent = CodeExecutorAgent(self.sandbox, self.feedback_loop)
+        self.critic_agent = CriticAgent()
+
+        # 5. Telemetry and Audit Trail
+        self.trace_logs: List[Dict[str, Any]] = []
+        self.current_state = "IDLE"
