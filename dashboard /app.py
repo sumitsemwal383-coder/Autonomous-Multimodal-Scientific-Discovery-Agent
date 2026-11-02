@@ -1,6 +1,8 @@
 
 import streamlit as st
 import pandas as pd
+import json
+import re
 
 # --------------------------------------------------
 # PAGE CONFIGURATION
@@ -13,6 +15,155 @@ st.set_page_config(
 )
 
 # --------------------------------------------------
+# HELPER FUNCTIONS
+# --------------------------------------------------
+
+def normalize_paper(paper):
+    """Standardize literature record fields."""
+
+    if not isinstance(paper, dict):
+        return None
+
+    authors = paper.get("authors", [])
+
+    if isinstance(authors, str):
+        authors = [authors]
+
+    return {
+        "title": str(paper.get("title", "Untitled Paper")),
+        "authors": authors,
+        "year": str(paper.get("year", "N/A")),
+        "journal": str(
+            paper.get("journal", paper.get("publication", "N/A"))
+        ),
+        "abstract": str(paper.get("abstract", "No abstract available.")),
+        "doi": str(paper.get("doi", "N/A")),
+        "url": str(paper.get("url", "")),
+        "keywords": paper.get("keywords", [])
+    }
+
+
+def create_apa_citation(paper):
+    """Generate a basic APA-style reference."""
+
+    authors = paper["authors"]
+
+    if not authors:
+        author_text = "Unknown Author"
+    elif len(authors) == 1:
+        author_text = str(authors[0])
+    elif len(authors) == 2:
+        author_text = f"{authors[0]} & {authors[1]}"
+    else:
+        author_text = ", ".join(str(a) for a in authors[:-1])
+        author_text += f", & {authors[-1]}"
+
+    citation = (
+        f"{author_text} ({paper['year']}). "
+        f"{paper['title']}. {paper['journal']}."
+    )
+
+    if paper["doi"] != "N/A":
+        citation += f" https://doi.org/{paper['doi']}"
+
+    return citation
+
+
+def escape_bibtex(value):
+    """Escape common BibTeX special characters."""
+
+    replacements = {
+        "&": r"\&",
+        "%": r"\%",
+        "$": r"\$",
+        "#": r"\#",
+        "_": r"\_",
+    }
+
+    for character, replacement in replacements.items():
+        value = value.replace(character, replacement)
+
+    return value
+
+
+def create_bibtex(paper, index):
+    """Generate a basic BibTeX article entry."""
+
+    first_author = (
+        str(paper["authors"][0])
+        if paper["authors"]
+        else "unknown"
+    )
+
+    author_key = re.sub(
+        r"[^a-zA-Z0-9]",
+        "",
+        first_author.split()[-1]
+    ).lower()
+
+    year_key = re.sub(r"[^0-9]", "", paper["year"])
+
+    citation_key = f"{author_key}{year_key}_{index}"
+
+    authors = " and ".join(
+        str(author) for author in paper["authors"]
+    ) or "Unknown Author"
+
+    return (
+        f"@article{{{citation_key},\n"
+        f"  author = {{{escape_bibtex(authors)}}},\n"
+        f"  title = {{{escape_bibtex(paper['title'])}}},\n"
+        f"  journal = {{{escape_bibtex(paper['journal'])}}},\n"
+        f"  year = {{{escape_bibtex(paper['year'])}}},\n"
+        f"  doi = {{{escape_bibtex(paper['doi'])}}}\n"
+        f"}}"
+    )
+
+
+def extract_papers(data):
+    """Accept either a list of papers or a dictionary containing papers."""
+
+    if isinstance(data, dict):
+        data = data.get("papers", [])
+
+    if not isinstance(data, list):
+        raise ValueError(
+            "JSON must contain a list of papers or a 'papers' list."
+        )
+
+    return [
+        normalized
+        for paper in data
+        if (normalized := normalize_paper(paper)) is not None
+    ]
+
+
+# --------------------------------------------------
+# SESSION STATE INITIALIZATION
+# --------------------------------------------------
+
+if "discovery_result" not in st.session_state:
+    st.session_state.discovery_result = None
+
+if "bench_result" not in st.session_state:
+    st.session_state.bench_result = None
+
+if "console_initialized" not in st.session_state:
+    st.session_state.console_initialized = False
+
+if "current_step" not in st.session_state:
+    st.session_state.current_step = 0
+
+if "state_history" not in st.session_state:
+    st.session_state.state_history = []
+
+if "literature_records" not in st.session_state:
+    st.session_state.literature_records = []
+
+if "literature_upload_name" not in st.session_state:
+    st.session_state.literature_upload_name = None
+
+# --------------------------------------------------
 # HEADER
 # --------------------------------------------------
 
@@ -21,7 +172,7 @@ st.subheader("Supervisor Monitoring Console")
 
 st.markdown(
     "Monitor the autonomous research workflow, agent progression, "
-    "and execution states from a centralized dashboard."
+    "literature knowledge base, and research citations."
 )
 
 # --------------------------------------------------
@@ -29,6 +180,7 @@ st.markdown(
 # --------------------------------------------------
 
 with st.sidebar:
+
     st.title("🧠 Supervisor Controls")
 
     research_topic = st.text_input(
@@ -69,23 +221,31 @@ with st.sidebar:
         st.markdown(f"• {agent}")
 
 # --------------------------------------------------
-# SESSION STATE INITIALIZATION
+# MAIN HEADER
 # --------------------------------------------------
 
-if "discovery_result" not in st.session_state:
-    st.session_state.discovery_result = None
+st.markdown("---")
 
-if "bench_result" not in st.session_state:
-    st.session_state.bench_result = None
+st.info(
+    f"**Research Topic:** {research_topic}  \n"
+    f"**Maximum Papers:** {max_papers}  \n"
+    f"**Docker Sandbox:** {'Enabled' if docker_enabled else 'Disabled'}  \n"
+    f"**Self-Debugging:** {'Enabled' if debug_enabled else 'Disabled'}"
+)
 
-if "console_initialized" not in st.session_state:
-    st.session_state.console_initialized = False
+# --------------------------------------------------
+# SUPERVISOR INITIALIZATION
+# --------------------------------------------------
 
-if "current_step" not in st.session_state:
+if st.button(
+    "🚀 Initialize Supervisor Console",
+    use_container_width=True
+):
+    st.session_state.console_initialized = True
     st.session_state.current_step = 0
-
-if "state_history" not in st.session_state:
     st.session_state.state_history = []
+
+    st.success("Supervisor console initialized successfully.")
 
 # --------------------------------------------------
 # WORKFLOW STATE DEFINITIONS
@@ -122,37 +282,12 @@ workflow_states = [
 total_steps = len(workflow_states)
 
 # --------------------------------------------------
-# MAIN HEADER
+# DASHBOARD
 # --------------------------------------------------
-
-st.markdown("---")
-
-st.info(
-    f"**Research Topic:** {research_topic}  \n"
-    f"**Maximum Papers:** {max_papers}  \n"
-    f"**Docker Sandbox:** {'Enabled' if docker_enabled else 'Disabled'}  \n"
-    f"**Self-Debugging:** {'Enabled' if debug_enabled else 'Disabled'}"
-)
-
-# --------------------------------------------------
-# SUPERVISOR INITIALIZATION
-# --------------------------------------------------
-
-if st.button("🚀 Initialize Supervisor Console", use_container_width=True):
-    st.session_state.console_initialized = True
-    st.session_state.current_step = 0
-    st.session_state.state_history = []
-    st.success("Supervisor console initialized successfully.")
 
 if st.session_state.console_initialized:
 
     st.success("Supervisor Console is Ready")
-
-    # --------------------------------------------------
-    # OVERVIEW
-    # --------------------------------------------------
-
-    st.subheader("System Overview")
 
     col1, col2, col3 = st.columns(3)
 
@@ -163,11 +298,10 @@ if st.session_state.console_initialized:
         st.metric("Workflow Stages", total_steps)
 
     with col3:
-        st.metric("Current Status", "Initialized")
-
-    # --------------------------------------------------
-    # DASHBOARD TABS
-    # --------------------------------------------------
+        st.metric(
+            "Literature Records",
+            len(st.session_state.literature_records)
+        )
 
     tabs = st.tabs([
         "Logic Tree & State Machine",
@@ -180,7 +314,7 @@ if st.session_state.console_initialized:
     ])
 
     # --------------------------------------------------
-    # TAB 1: INTERACTIVE LOGIC TREE
+    # TAB 1: LOGIC TREE
     # --------------------------------------------------
 
     with tabs[0]:
@@ -188,23 +322,21 @@ if st.session_state.console_initialized:
         st.subheader("🔀 Research Workflow State Machine")
 
         st.write(
-            "The logic tree represents the sequence of autonomous "
-            "research agents involved in the scientific discovery process."
+            "Visual representation of the autonomous "
+            "research agent execution sequence."
         )
 
         current_step = st.session_state.current_step
 
-        # Build Graphviz visualization
-        graph = ["digraph ResearchWorkflow {"]
-        graph.append('rankdir=TB;')
-        graph.append('node [shape=box, style="rounded,filled", '
-                     'fontname="Arial", fontsize=10, '
-                     'margin="0.25,0.15"];')
-        graph.append('edge [color="gray", penwidth=1.5];')
+        graph = [
+            "digraph ResearchWorkflow {",
+            "rankdir=TB;",
+            'node [shape=box, style="rounded,filled", '
+            'fontname="Arial", fontsize=10];',
+            'edge [color="gray", penwidth=1.5];'
+        ]
 
         for index, state in enumerate(workflow_states):
-
-            node_id = f"stage{index}"
 
             if index < current_step:
                 fill_color = "palegreen"
@@ -225,59 +357,37 @@ if st.session_state.console_initialized:
             )
 
             graph.append(
-                f'{node_id} [label="{label}", fillcolor="{fill_color}"];'
+                f'stage{index} [label="{label}", '
+                f'fillcolor="{fill_color}"];'
             )
 
             if index > 0:
                 graph.append(
-                    f'stage{index - 1} -> {node_id};'
+                    f'stage{index - 1} -> stage{index};'
                 )
 
         graph.append("}")
 
-        st.graphviz_chart("\n".join(graph), use_container_width=True)
-
-        # --------------------------------------------------
-        # CURRENT WORKFLOW STATE
-        # --------------------------------------------------
+        st.graphviz_chart(
+            "\n".join(graph),
+            use_container_width=True
+        )
 
         st.divider()
-
-        st.subheader("Current Agent Status")
 
         if current_step < total_steps:
 
             active_state = workflow_states[current_step]
 
-            st.info(f"**Active Stage:** {active_state['name']}")
+            st.info(f"Active Stage: {active_state['name']}")
 
-            col1, col2 = st.columns(2)
+            st.write("**Assigned Agent:**", active_state["agent"])
+            st.write("**Description:**", active_state["description"])
 
-            with col1:
-                st.write("**Assigned Agent**")
-                st.write(active_state["agent"])
-
-            with col2:
-                st.write("**Stage Progress**")
-                st.progress(
-                    (current_step + 1) / total_steps
-                )
-
-            st.write("**Stage Description**")
-            st.write(active_state["description"])
+            st.progress((current_step + 1) / total_steps)
 
         else:
-            st.success(
-                "All workflow stages have been completed successfully."
-            )
-
-        # --------------------------------------------------
-        # INTERACTIVE STATE CONTROLS
-        # --------------------------------------------------
-
-        st.divider()
-
-        st.subheader("Interactive State Controls")
+            st.success("All workflow stages have been completed.")
 
         col1, col2, col3 = st.columns(3)
 
@@ -297,6 +407,7 @@ if st.session_state.console_initialized:
                 use_container_width=True
             ):
                 if current_step < total_steps:
+
                     completed_state = workflow_states[current_step]
 
                     st.session_state.state_history.append({
@@ -318,59 +429,354 @@ if st.session_state.console_initialized:
                 st.session_state.state_history = []
                 st.rerun()
 
-        # --------------------------------------------------
-        # WORKFLOW EXECUTION HISTORY
-        # --------------------------------------------------
-
-        st.divider()
-
-        st.subheader("Workflow Execution History")
-
         if st.session_state.state_history:
 
-            history_df = pd.DataFrame(
-                st.session_state.state_history
-            )
+            st.subheader("Workflow Execution History")
 
             st.dataframe(
-                history_df,
+                pd.DataFrame(st.session_state.state_history),
                 use_container_width=True,
                 hide_index=True
             )
 
-        else:
-            st.caption(
-                "No workflow stages have been completed yet. "
-                "Use Next Stage to simulate agent progression."
-            )
-
     # --------------------------------------------------
-    # REMAINING PLACEHOLDER TABS
+    # TAB 2: LITERATURE KNOWLEDGE BASE EXPLORER
     # --------------------------------------------------
 
     with tabs[1]:
-        st.subheader("Literature & Vector Store")
-        st.info("Literature exploration interface will be integrated in a future stage.")
+
+        st.subheader("📚 Literature Knowledge Base Explorer")
+
+        st.write(
+            "Explore research papers, inspect publication details, "
+            "and generate formatted citations."
+        )
+
+        # --------------------------------------------------
+        # IMPORT LITERATURE RECORDS
+        # --------------------------------------------------
+
+        st.markdown("### Import Research Papers")
+
+        uploaded_file = st.file_uploader(
+            "Upload literature records in JSON format",
+            type=["json"],
+            help=(
+                "Upload a JSON list of research papers or an object "
+                "containing a 'papers' list."
+            ),
+            key="literature_json_upload"
+        )
+
+        if uploaded_file is not None:
+
+            if (
+                st.session_state.literature_upload_name
+                != uploaded_file.name
+            ):
+
+                try:
+                    imported_data = json.load(uploaded_file)
+                    imported_papers = extract_papers(imported_data)
+
+                    st.session_state.literature_records = imported_papers
+                    st.session_state.literature_upload_name = uploaded_file.name
+
+                    st.success(
+                        f"Successfully imported {len(imported_papers)} "
+                        "literature records."
+                    )
+
+                except (json.JSONDecodeError, ValueError) as error:
+                    st.error(f"Unable to import JSON: {error}")
+
+        # --------------------------------------------------
+        # KNOWLEDGE BASE METRICS
+        # --------------------------------------------------
+
+        papers = st.session_state.literature_records
+
+        st.divider()
+
+        metric1, metric2, metric3 = st.columns(3)
+
+        with metric1:
+            st.metric("Total Papers", len(papers))
+
+        with metric2:
+            authors = {
+                author
+                for paper in papers
+                for author in paper["authors"]
+            }
+            st.metric("Unique Authors", len(authors))
+
+        with metric3:
+            years = {
+                paper["year"]
+                for paper in papers
+                if paper["year"] != "N/A"
+            }
+            st.metric("Publication Years", len(years))
+
+        # --------------------------------------------------
+        # SEARCH AND FILTER
+        # --------------------------------------------------
+
+        st.markdown("### Search and Filter Literature")
+
+        if papers:
+
+            search_query = st.text_input(
+                "Search by title, author, abstract, or keyword",
+                placeholder="Enter a search term..."
+            )
+
+            available_years = sorted(
+                {
+                    paper["year"]
+                    for paper in papers
+                    if paper["year"] != "N/A"
+                },
+                reverse=True
+            )
+
+            year_options = ["All Years"] + available_years
+
+            selected_year = st.selectbox(
+                "Filter by Publication Year",
+                year_options
+            )
+
+            filtered_papers = []
+
+            for paper in papers:
+
+                searchable_text = " ".join([
+                    paper["title"],
+                    paper["abstract"],
+                    paper["journal"],
+                    " ".join(str(a) for a in paper["authors"]),
+                    " ".join(str(k) for k in paper["keywords"])
+                ]).lower()
+
+                matches_search = (
+                    search_query.lower() in searchable_text
+                )
+
+                matches_year = (
+                    selected_year == "All Years"
+                    or paper["year"] == selected_year
+                )
+
+                if matches_search and matches_year:
+                    filtered_papers.append(paper)
+
+            st.write(
+                f"**Showing {len(filtered_papers)} of {len(papers)} papers**"
+            )
+
+            # --------------------------------------------------
+            # LITERATURE TABLE
+            # --------------------------------------------------
+
+            if filtered_papers:
+
+                literature_table = pd.DataFrame([
+                    {
+                        "Title": paper["title"],
+                        "Authors": ", ".join(
+                            str(a) for a in paper["authors"]
+                        ),
+                        "Year": paper["year"],
+                        "Publication": paper["journal"]
+                    }
+                    for paper in filtered_papers
+                ])
+
+                st.dataframe(
+                    literature_table,
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+                # --------------------------------------------------
+                # PAPER DETAILS VIEWER
+                # --------------------------------------------------
+
+                st.divider()
+
+                st.markdown("### Research Paper Details")
+
+                selected_title = st.selectbox(
+                    "Select a paper to inspect",
+                    options=[
+                        paper["title"]
+                        for paper in filtered_papers
+                    ]
+                )
+
+                selected_paper = next(
+                    paper
+                    for paper in filtered_papers
+                    if paper["title"] == selected_title
+                )
+
+                st.markdown(f"#### {selected_paper['title']}")
+
+                st.write(
+                    "**Authors:**",
+                    ", ".join(
+                        str(a) for a in selected_paper["authors"]
+                    ) or "Unknown"
+                )
+
+                st.write("**Publication Year:**", selected_paper["year"])
+                st.write("**Journal:**", selected_paper["journal"])
+                st.write("**DOI:**", selected_paper["doi"])
+
+                if selected_paper["url"]:
+                    st.markdown(
+                        f"[Open Research Paper]({selected_paper['url']})"
+                    )
+
+                st.markdown("**Abstract**")
+
+                st.write(selected_paper["abstract"])
+
+                st.write(
+                    "**Keywords:**",
+                    ", ".join(
+                        str(k) for k in selected_paper["keywords"]
+                    ) or "Not provided"
+                )
+
+                # --------------------------------------------------
+                # CITATION VIEWER
+                # --------------------------------------------------
+
+                st.divider()
+
+                st.markdown("### Citation Viewer")
+
+                apa_citation = create_apa_citation(selected_paper)
+
+                bibtex_citation = create_bibtex(
+                    selected_paper,
+                    filtered_papers.index(selected_paper) + 1
+                )
+
+                citation_format = st.radio(
+                    "Select Citation Format",
+                    ["APA", "BibTeX"],
+                    horizontal=True
+                )
+
+                if citation_format == "APA":
+
+                    st.code(
+                        apa_citation,
+                        language="text"
+                    )
+
+                    st.download_button(
+                        "Download APA Citation",
+                        data=apa_citation,
+                        file_name="citation.txt",
+                        mime="text/plain"
+                    )
+
+                else:
+
+                    st.code(
+                        bibtex_citation,
+                        language="bibtex"
+                    )
+
+                    st.download_button(
+                        "Download BibTeX Citation",
+                        data=bibtex_citation,
+                        file_name="citation.bib",
+                        mime="application/x-bibtex"
+                    )
+
+            else:
+                st.warning(
+                    "No papers match your search or selected filters."
+                )
+
+        else:
+
+            st.info(
+                "The literature knowledge base is currently empty. "
+                "Upload a JSON file containing research-paper records "
+                "to explore papers and generate citations."
+            )
+
+    # --------------------------------------------------
+    # TAB 3: MULTIMODAL VISION
+    # --------------------------------------------------
 
     with tabs[2]:
+
         st.subheader("Multimodal Vision")
-        st.info("Visual research analysis will be integrated in a future stage.")
+
+        st.info(
+            "Visual research analysis will be integrated "
+            "in a future development stage."
+        )
+
+    # --------------------------------------------------
+    # TAB 4: SANDBOX
+    # --------------------------------------------------
 
     with tabs[3]:
+
         st.subheader("Sandbox & Self-Debugging")
-        st.info("Sandbox execution monitoring will be integrated in a future stage.")
+
+        st.info(
+            "Sandbox execution monitoring will be integrated "
+            "in a future development stage."
+        )
+
+    # --------------------------------------------------
+    # TAB 5: STATISTICAL CRITIC
+    # --------------------------------------------------
 
     with tabs[4]:
+
         st.subheader("Statistical Critic")
-        st.info("Statistical evaluation metrics will be integrated in a future stage.")
+
+        st.info(
+            "Statistical evaluation metrics will be integrated "
+            "in a future development stage."
+        )
+
+    # --------------------------------------------------
+    # TAB 6: LATEX PAPER
+    # --------------------------------------------------
 
     with tabs[5]:
+
         st.subheader("LaTeX Research Paper")
-        st.info("Research manuscript preview will be integrated in a future stage.")
+
+        st.info(
+            "Research manuscript preview will be integrated "
+            "in a future development stage."
+        )
+
+    # --------------------------------------------------
+    # TAB 7: BENCHMARK
+    # --------------------------------------------------
 
     with tabs[6]:
+
         st.subheader("Holdout Benchmark")
-        st.info("Benchmark evaluation will be integrated in a future stage.")
+
+        st.info(
+            "Benchmark evaluation will be integrated "
+            "in a future development stage."
+        )
 
 else:
 
