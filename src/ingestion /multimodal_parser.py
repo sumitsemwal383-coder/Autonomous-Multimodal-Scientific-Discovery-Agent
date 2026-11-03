@@ -1,54 +1,40 @@
 
-    def synthesize_visual_chunks(
+    def ingest_visual_evidence(
         self,
         figures: list,
+        vector_db,
         paper_metadata: Dict[str, Any] = None
-    ) -> list:
-        """Convert extracted figure evidence into searchable text chunks."""
-        paper_metadata = paper_metadata or {}
-        chunks = []
+    ) -> Dict[str, Any]:
+        """Convert visual evidence into chunks and store them for RAG."""
+        chunks = self.synthesize_visual_chunks(
+            figures,
+            paper_metadata
+        )
 
-        for index, figure in enumerate(figures, start=1):
-            figure_id = figure.get("figure_id", f"Fig_{index}")
-            caption = figure.get("caption", "")
-            figure_type = figure.get("type", figure.get("figure_type", "Unknown"))
-            interpretation = figure.get("interpretation", "")
-            summary = figure.get("quantitative_summary", "")
+        inserted = 0
+        failed = []
 
-            data_points = figure.get(
-                "key_data_points",
-                figure.get("data_points", [])
-            )
+        for chunk in chunks:
+            try:
+                vector_db.insert(
+                    doc_id=chunk["id"],
+                    text=chunk["text"],
+                    metadata=chunk["metadata"]
+                )
+                inserted += 1
 
-            if not any([caption, interpretation, summary, data_points]):
-                continue
+            except Exception as exc:
+                logger.exception(
+                    "Failed to index visual chunk %s",
+                    chunk["id"]
+                )
+                failed.append({
+                    "id": chunk["id"],
+                    "error": str(exc)
+                })
 
-            point_text = "; ".join(
-                str(point) for point in data_points
-            )
-
-            text = (
-                f"Figure ID: {figure_id}\n"
-                f"Figure type: {figure_type}\n"
-                f"Caption: {caption}\n"
-                f"Interpretation: {interpretation}\n"
-                f"Quantitative summary: {summary}\n"
-                f"Data points: {point_text}"
-            )
-
-            chunks.append({
-                "id": (
-                    f"{paper_metadata.get('id', 'unknown_paper')}"
-                    f"_{figure_id}"
-                ),
-                "text": text,
-                "metadata": {
-                    **paper_metadata,
-                    "figure_id": figure_id,
-                    "figure_type": figure_type,
-                    "caption": caption,
-                    "content_type": "visual_evidence"
-                }
-            })
-
-        return chunks
+        return {
+            "total_chunks": len(chunks),
+            "inserted": inserted,
+            "failed": failed
+        }
