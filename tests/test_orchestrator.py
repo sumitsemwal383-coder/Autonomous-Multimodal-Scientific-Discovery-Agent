@@ -1,7 +1,3 @@
-"""
-Multi-Agent Orchestrator and Self-Debugging Loop Tests
-Validates the complete closed-loop scientific discovery pipeline and RL self-debugging.
-"""
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
