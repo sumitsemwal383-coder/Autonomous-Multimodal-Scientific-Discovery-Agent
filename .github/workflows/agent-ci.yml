@@ -1,0 +1,47 @@
+
+name: Agent Continuous Integration Pipeline
+
+on:
+  push:
+    branches: [janhavi]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-agent-suite:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Run Ingestion Tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: python -m pytest tests/test_ingestion.py -v
+
+      - name: Run Statistical Critic Tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: python -m pytest tests/test_statistical_critic.py -v
+
+      - name: Run LaTeX Synthesis Tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: python -m pytest tests/test_latex_synthesis.py -v
+
+      - name: Run Holdout Benchmark Tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: python -m pytest tests/test_benchmark_evaluator.py -v
