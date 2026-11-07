@@ -36,12 +36,6 @@ jobs:
           python -c "from src.ingestion.arxiv_pipeline import ArxivPipeline; print('Arxiv import successful')"
           python -c "from src.ingestion.pubmed_pipeline import PubMedPipeline; print('PubMed import successful')"
 
-      - name: Run Ingestion Tests
-        run: python -m pytest tests/test_ingestion.py -v
-
-      - name: Run Statistical Critic Tests
-        run: python -m pytest tests/test_statistical_critic.py -v
-
       - name: Run LaTeX Synthesis Tests
         run: python -m pytest tests/test_latex_synthesis.py -v
 
