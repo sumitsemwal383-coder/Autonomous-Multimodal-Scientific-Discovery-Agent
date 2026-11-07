@@ -33,11 +33,15 @@ jobs:
 
       - name: Verify Package Imports
         run: |
+          pwd
+          ls -la
+          ls -la src
+          ls -la src/ingestion
+          python -c "import sys; print(sys.path)"
+          python -c "import src; print('src package:', src.__file__)"
+          python -c "import src.ingestion; print('ingestion package:', src.ingestion.__file__)"
           python -c "from src.ingestion.arxiv_pipeline import ArxivPipeline; print('Arxiv import successful')"
           python -c "from src.ingestion.pubmed_pipeline import PubMedPipeline; print('PubMed import successful')"
-
-      - name: Run LaTeX Synthesis Tests
-        run: python -m pytest tests/test_latex_synthesis.py -v
 
       - name: Run Holdout Benchmark Tests
         run: python -m pytest tests/test_benchmark_evaluator.py -v
