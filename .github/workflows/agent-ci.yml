@@ -3,13 +3,18 @@ name: Agent Continuous Integration Pipeline
 
 on:
   push:
-    branches: [janhavi]
+    branches:
+      - janhavi
   pull_request:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
   test-agent-suite:
     runs-on: ubuntu-latest
+
+    env:
+      PYTHONPATH: ${{ github.workspace }}
 
     steps:
       - name: Checkout Repository
@@ -26,22 +31,19 @@ jobs:
           pip install -r requirements.txt
           pip install pytest
 
+      - name: Verify Package Imports
+        run: |
+          python -c "from src.ingestion.arxiv_pipeline import ArxivPipeline; print('Arxiv import successful')"
+          python -c "from src.ingestion.pubmed_pipeline import PubMedPipeline; print('PubMed import successful')"
+
       - name: Run Ingestion Tests
-        env:
-          PYTHONPATH: ${{ github.workspace }}
         run: python -m pytest tests/test_ingestion.py -v
 
       - name: Run Statistical Critic Tests
-        env:
-          PYTHONPATH: ${{ github.workspace }}
         run: python -m pytest tests/test_statistical_critic.py -v
 
       - name: Run LaTeX Synthesis Tests
-        env:
-          PYTHONPATH: ${{ github.workspace }}
         run: python -m pytest tests/test_latex_synthesis.py -v
 
       - name: Run Holdout Benchmark Tests
-        env:
-          PYTHONPATH: ${{ github.workspace }}
         run: python -m pytest tests/test_benchmark_evaluator.py -v
