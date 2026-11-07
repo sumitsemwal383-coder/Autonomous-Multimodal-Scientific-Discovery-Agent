@@ -1,19 +1,41 @@
 
 from pathlib import Path
 
-# Project root directory
+# ============================================================
+# PROJECT DIRECTORIES
+# ============================================================
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Cache directory
-CACHE_DIR = BASE_DIR / "data" / "cache"
+DATA_DIR = BASE_DIR / "data"
 
-# Create cache directory if it does not exist
+CACHE_DIR = DATA_DIR / "cache"
+
+HOLDOUT_DIR = DATA_DIR / "holdout_papers"
+
+VECTOR_STORE_DIR = DATA_DIR / "vector_store"
+
+
+# ============================================================
+# CREATE REQUIRED DIRECTORIES
+# ============================================================
+
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
+HOLDOUT_DIR.mkdir(parents=True, exist_ok=True)
+VECTOR_STORE_DIR.mkdir(parents=True, exist_ok=True)
 
-# ArXiv API
+
+# ============================================================
+# ARXIV API CONFIGURATION
+# ============================================================
+
 ARXIV_API_URL = "https://export.arxiv.org/api/query"
 
-# PubMed APIs
+
+# ============================================================
+# PUBMED API CONFIGURATION
+# ============================================================
+
 PUBMED_ESEARCH_URL = (
     "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
 )
