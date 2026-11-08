@@ -3,7 +3,6 @@ Holdout Benchmark Evaluator
 Grades the autonomous discovery agent's output against a holdout dataset of
 human-authored peer-reviewed research papers across groundedness, empirical rigor, and synthesis fidelity.
 """
-
 import json
 import logging
 from pathlib import Path
