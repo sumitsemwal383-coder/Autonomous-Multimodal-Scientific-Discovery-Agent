@@ -1,13 +1,17 @@
-
 name: Agent Continuous Integration Pipeline
 
 on:
   push:
+
     branches:
       - janhavi
   pull_request:
     branches:
       - main
+
+    branches: [ main, "feature/**" ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   test-agent-suite:
@@ -24,6 +28,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"
 
       - name: Install Dependencies
         run: |
@@ -45,3 +50,15 @@ jobs:
 
       - name: Run Holdout Benchmark Tests
         run: python -m pytest tests/test_benchmark_evaluator.py -v
+
+      - name: Run Ingestion Tests
+        run: python tests/test_ingestion.py
+
+      - name: Run Statistical Critic Tests
+        run: python tests/test_critic_agent.py
+
+      - name: Run LaTeX Synthesis Tests
+        run: python tests/test_synthesis.py
+
+      - name: Run Multi-Agent Orchestrator & Self-Debugging Suite
+        run: python tests/test_orchestrator.py
