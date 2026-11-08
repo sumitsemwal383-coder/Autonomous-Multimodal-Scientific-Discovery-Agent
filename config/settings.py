@@ -1,102 +1,125 @@
-from pathlib import Path
+    def __init__(self, timeout_seconds=SANDBOX_TIMEOUT_SECONDS):
+        self.timeout_seconds = timeout_seconds
 
-# Project root
-BASE_DIR = Path(__file__).resolve().parent.parent
+    def execute(self, code_str):
+        # Step 1: Validate source code.
+        is_valid, violation, is_breakout = validate_code(code_str)
 
-# Data directories
-DATA_DIR = BASE_DIR / "data"
-CACHE_DIR = DATA_DIR / "cache"
-HOLDOUT_DIR = DATA_DIR / "holdout_papers"
-VECTOR_STORE_DIR = DATA_DIR / "vector_store"
+        if not is_valid:
+            logger.warning("Sandbox validation failed: %s", violation)
 
-# Create directories if missing
-for directory in (CACHE_DIR, HOLDOUT_DIR, VECTOR_STORE_DIR):
-    directory.mkdir(parents=True, exist_ok=True)
+            return ExecutionResult(
+                success=False,
+                stdout="",
+                stderr=f"SECURITY VIOLATION: {violation}",
+                exit_code=-1,
+                duration=0.0,
+                metrics={},
+                security_violation=violation,
+                is_breakout_attempt=is_breakout,
+                sandbox_mode="hardened_ast_subproc",
+            )
 
-# ArXiv API
-ARXIV_API_URL = "https://export.arxiv.org/api/query"
+        # Step 2: Create a temporary working directory.
+        with tempfile.TemporaryDirectory(
+            prefix="agent_sandbox_"
+        ) as tmpdir:
+            script_path = Path(tmpdir) / "experiment_run.py"
 
-# PubMed APIs
-PUBMED_ESEARCH_URL = (
-    "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
-)
+            instrumented_code = self._instrument_code(code_str)
 
-PUBMED_ESUMMARY_URL = (
-    "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
-)
+            with open(script_path, "w", encoding="utf-8") as file:
+                file.write(instrumented_code)
 
-PUBMED_EFETCH_URL = (
-    "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
-)
-import os
-from pathlib import Path
+            start_time = time.time()
 
-# Base Paths
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DATA_DIR = PROJECT_ROOT / "data"
-CACHE_DIR = DATA_DIR / "cache"
-VECTOR_STORE_DIR = DATA_DIR / "vector_store"
-HOLDOUT_DIR = DATA_DIR / "holdout_papers"
-SYNTHESIS_DIR = PROJECT_ROOT / "data" / "synthesis"
-TEMPLATES_DIR = PROJECT_ROOT / "src" / "synthesis" / "templates"
-DOCKER_DIR = PROJECT_ROOT / "docker"
+            try:
+                # Step 3: Execute with a time limit.
+                proc = subprocess.run(
+                    [sys.executable, str(script_path)],
+                    cwd=tmpdir,
+                    capture_output=True,
+                    text=True,
+                    timeout=self.timeout_seconds,
+                    env={
+                        "PATH": str(Path(sys.executable).parent),
+                        "PYTHONIOENCODING": "utf-8",
+                        "PYTHONNOUSERSITE": "1",
+                    },
+                )
 
-# Create directories if not existing
-for directory in [DATA_DIR, CACHE_DIR, VECTOR_STORE_DIR, HOLDOUT_DIR, SYNTHESIS_DIR]:
-    directory.mkdir(parents=True, exist_ok=True)
+                duration = time.time() - start_time
+                stdout = proc.stdout
+                stderr = proc.stderr
 
-# ArXiv & PubMed API Configuration
-ARXIV_API_URL = "http://export.arxiv.org/api/query"
-PUBMED_ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
-PUBMED_ESUMMARY_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
-PUBMED_EFETCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+                return ExecutionResult(
+                    success=(proc.returncode == 0),
+                    stdout=stdout,
+                    stderr=stderr,
+                    exit_code=proc.returncode,
+                    duration=duration,
+                    metrics=self._extract_metrics(stdout),
+                    security_violation=None,
+                    is_breakout_attempt=False,
+                    sandbox_mode="hardened_ast_subproc",
+                )
 
-# Sandboxed Code Execution Policy
-SANDBOX_TIMEOUT_SECONDS = 30
-SANDBOX_MAX_MEMORY_MB = 512
-SANDBOX_ENABLE_DOCKER = os.getenv("ENABLE_DOCKER_SANDBOX", "false").lower() == "true"
-SANDBOX_DISALLOWED_IMPORTS = [
-    "os.system",
-    "subprocess",
-    "shutil.rmtree",
-    "ctypes",
-    "socket",
-    "requests",
-    "urllib",
-    "http",
-    "ftplib",
-    "telnetlib",
-    "paramiko",
-    "pty",
-    "fcntl",
-    "pwd",
-    "grp",
-    "sys.exit",
-    "exit",
-    "quit",
-    "builtins.__import__",
-]
+            except subprocess.TimeoutExpired:
+                duration = time.time() - start_time
 
-# Statistical Critic Configuration
-STATISTICAL_ALPHA_DEFAULT = 0.05
-STATISTICAL_CONFIDENCE_INTERVAL = 0.95
-MIN_STATISTICAL_POWER = 0.80
-EFFECT_SIZE_MODERATE_THRESHOLD = 0.50
+                return ExecutionResult(
+                    success=False,
+                    stdout="",
+                    stderr=(
+                        f"Execution timed out after "
+                        f"{self.timeout_seconds} seconds."
+                    ),
+                    exit_code=-2,
+                    duration=duration,
+                    metrics={},
+                    security_violation="Execution timeout exceeded",
+                    is_breakout_attempt=False,
+                    sandbox_mode="hardened_ast_subproc",
+                )
 
-# LLM & Model Execution Settings
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "mock_heuristic")  # options: "mock_heuristic", "openai", "gemini"
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+            except Exception as error:
+                duration = time.time() - start_time
 
-# Context Window & Memory Limits
-MAX_CONTEXT_TOKENS = 8192
-SLIDING_WINDOW_HISTORY = 10
-MEMORY_SUMMARY_THRESHOLD_TOKENS = 4096
+                return ExecutionResult(
+                    success=False,
+                    stdout="",
+                    stderr=f"Sandbox execution error: {error}",
+                    exit_code=-3,
+                    duration=duration,
+                    metrics={},
+                    security_violation=str(error),
+                    is_breakout_attempt=False,
+                    sandbox_mode="hardened_ast_subproc",
+                )
 
-# RL Feedback Loop
-RL_MAX_DEBUG_ITERATIONS = 4
-RL_REWARD_SYNTAX_PASS = 0.25
-RL_REWARD_EXEC_PASS = 0.25
-RL_REWARD_STAT_PASS = 0.35
-RL_REWARD_NOVELTY_PASS = 0.15
+    def _instrument_code(self, code):
+        """Append a footer to export experiment metrics."""
+        footer = """
+import json
 
+if '__AGENT_METRICS__' in locals():
+    print('__AGENT_METRICS__:' + json.dumps(__AGENT_METRICS__))
+"""
+        return code + "\n" + footer
+
+    def _extract_metrics(self, stdout):
+        """Extract structured metrics from process output."""
+        metrics = {}
+
+        for line in stdout.splitlines():
+            if line.startswith("__AGENT_METRICS__:"):
+                try:
+                    data = json.loads(
+                        line.split(":", 1)[1].strip()
+                    )
+                    if isinstance(data, dict):
+                        metrics.update(data)
+                except (json.JSONDecodeError, TypeError):
+                    logger.warning("Could not parse metrics output")
+
+        return metrics
