@@ -28,7 +28,6 @@ PUBMED_ESUMMARY_URL = (
 PUBMED_EFETCH_URL = (
     "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
 )
-=======
 import os
 from pathlib import Path
 
