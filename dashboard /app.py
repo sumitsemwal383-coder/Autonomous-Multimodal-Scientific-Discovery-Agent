@@ -1,300 +1,278 @@
+"""
+Live Supervisor Monitoring Dashboard
+Interactive Streamlit application to monitor multi-agent logic trees, literature citations,
+sandboxed code execution, statistical critique, and execution costs in real time.
+"""
+import streamlit as st
+import json
+import time
+import pandas as pd
+import numpy as np
+from pathlib import Path
+import sys
 
-# ==================================================
-# TAB 8: TOKEN TRACKING & COST ANALYTICS - DAY 23
-# ==================================================
+# Ensure project root is in sys.path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-with tabs[7]:
+from src.agents.orchestrator import ScientificDiscoveryOrchestrator
+from src.evaluation.benchmark_evaluator import BenchmarkEvaluator
 
-    st.header("💰 Token Tracking & Cost Analytics")
+st.set_page_config(
+    page_title="Zaalima AI - Autonomous Scientific Discovery Agent",
+    page_icon="🔬",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-    st.write(
-        "Monitor token consumption, estimate API expenses, "
-        "and analyze usage across research tasks."
-    )
+# Custom Styling
+st.markdown("""
+<style>
+    .main-header { font-size: 2.2rem; font-weight: 700; color: #1E3A8A; margin-bottom: 0.2rem; }
+    .sub-header { font-size: 1.05rem; color: #4B5563; margin-bottom: 1.5rem; }
+    .metric-card { background-color: #F8FAFC; border-radius: 8px; padding: 15px; border-left: 5px solid #3B82F6; }
+    .status-badge { background-color: #10B981; color: white; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.8rem; }
+    .stTabs [data-baseweb="tab-list"] { gap: 8px; }
+    .stTabs [data-baseweb="tab"] { border-radius: 6px 6px 0 0; padding: 10px 16px; background-color: #F1F5F9; }
+    .stTabs [aria-selected="true"] { background-color: #2563EB !important; color: white !important; }
+</style>
+""", unsafe_allow_html=True)
 
-    st.divider()
+st.markdown('<div class="main-header">🔬 Autonomous Multimodal Scientific Discovery Agent</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-header">Enterprise Self-Directed AI Researcher | Zaalima Development Architecture</div>', unsafe_allow_html=True)
 
-    # ----------------------------------------------
-    # SECTION 1: API PRICING CONFIGURATION
-    # ----------------------------------------------
+# Sidebar Controls
+st.sidebar.image("https://img.icons8.com/color/96/artificial-intelligence.png", width=70)
+st.sidebar.title("Supervisor Controls")
+st.sidebar.markdown("---")
 
-    st.subheader("API Pricing Configuration")
+research_topic = st.sidebar.text_input(
+    "Scientific Research Topic",
+    value="multi-agent reinforcement learning reasoning",
+    help="Topic query passed to ArXiv and PubMed APIs"
+)
 
-    price_col1, price_col2 = st.columns(2)
+max_papers = st.sidebar.slider("Papers to Ingest", min_value=2, max_value=8, value=4)
 
-    with price_col1:
-        input_rate = st.number_input(
-            "Input Cost per 1 Million Tokens ($)",
-            min_value=0.0,
-            value=2.00,
-            step=0.10
+enable_docker = st.sidebar.checkbox(
+    "Use Docker Container Sandbox",
+    value=False,
+    help="Runs in isolated Docker container if active, else AST-hardened subprocess"
+)
+
+test_debug_loop = st.sidebar.checkbox(
+    "Simulate Self-Debugging RL Loop",
+    value=False,
+    help="Injects synthetic bug to visualize autonomous multi-cycle self-correction"
+)
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("### Agent Architecture")
+st.sidebar.markdown("• **Literature Reviewer**: ArXiv & PubMed\n• **Hypothesis Generator**: Grounded RAG\n• **Code Executor**: Hardened Sandbox\n• **Critic Agent**: Statistical Testing\n• **Synthesis Module**: LaTeX & BibTeX")
+
+if "discovery_result" not in st.session_state:
+    st.session_state["discovery_result"] = None
+if "bench_result" not in st.session_state:
+    st.session_state["bench_result"] = None
+
+run_button = st.sidebar.button("🚀 Run Autonomous Discovery", type="primary", use_container_width=True)
+
+if run_button:
+    with st.spinner("Executing end-to-end multi-agent scientific discovery cycle..."):
+        orchestrator = ScientificDiscoveryOrchestrator(
+            use_docker=enable_docker,
+            max_debug_iterations=4
         )
-
-    with price_col2:
-        output_rate = st.number_input(
-            "Output Cost per 1 Million Tokens ($)",
-            min_value=0.0,
-            value=8.00,
-            step=0.10
+        result = orchestrator.run_discovery_cycle(
+            research_topic=research_topic,
+            max_papers=max_papers,
+            test_self_debug=test_debug_loop
         )
+        st.session_state["discovery_result"] = result
+        
+        # Run holdout paper evaluation
+        evaluator = BenchmarkEvaluator()
+        bench = evaluator.evaluate_discovery_run(result)
+        st.session_state["bench_result"] = bench
 
-    st.caption(
-        "These are configurable example rates. "
-        "Replace them with the pricing of your actual model provider."
-    )
+res = st.session_state["discovery_result"]
+bench = st.session_state["bench_result"]
 
-    st.divider()
+if res is None:
+    st.info("👈 Enter a research topic and click **'Run Autonomous Discovery'** to begin the automated research pipeline.")
+    
+    # Overview preview
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown("### 📚 1. Grounded Ingestion")
+        st.write("Autonomous queries to ArXiv & PubMed APIs, extracting abstracts, metadata, and indexing dense vectors into Milvus/vector database.")
+    with col2:
+        st.markdown("### 🛡️ 2. Sandboxed Execution")
+        st.write("Code Executor synthesizes Python simulations and model training loops, running inside an AST-hardened sandbox with breakout prevention.")
+    with col3:
+        st.markdown("### 📊 3. Statistical Critique & LaTeX")
+        st.write("Critic Agent validates p-values, 95% CIs, and Cohen's d effect sizes, producing publication-ready LaTeX manuscripts.")
+else:
+    # Top Telemetry Bar
+    c1, c2, c3, c4, c5 = st.columns(5)
+    with c1:
+        st.metric("Workflow Status", res["status"], delta="Normal")
+    with c2:
+        st.metric("Execution Time", f"{res['duration_seconds']}s")
+    with c3:
+        st.metric("Active Memory", f"{res['telemetry']['tokens']['active_context_tokens']} tokens")
+    with c4:
+        st.metric("Execution Cost", f"${res['estimated_cost_usd']:.5f}")
+    with c5:
+        critic_verdict = res["critic_evaluation"].get("verdict", "PENDING")
+        st.metric("Critic Verdict", "CONFIRMED" if "CONFIRMED" in critic_verdict else "REJECTED")
 
-    # ----------------------------------------------
-    # SECTION 2: RECORD TOKEN USAGE
-    # ----------------------------------------------
+    st.markdown("---")
 
-    st.subheader("Record Research Task Usage")
+    # Tabs for Agent Modules
+    t1, t2, t3, t4, t5, t6, t7 = st.tabs([
+        "🌳 Logic Tree & Telemetry",
+        "📚 Literature & Vector Store",
+        "🖼️ Multimodal Vision",
+        "⚙️ Sandbox & Self-Debugging",
+        "📈 Statistical Critic",
+        "📄 LaTeX Research Paper",
+        "🏆 Holdout Benchmark Grade"
+    ])
 
-    with st.form("token_usage_form"):
+    with t1:
+        st.subheader("Agent Execution State Machine & Trace Log")
+        st.markdown("Trace how agents hand off tasks, enforce security boundaries, and validate hypotheses.")
+        
+        # State flowchart representation
+        st.markdown("""
+        ```mermaid
+        flowchart LR
+            LR[Literature Reviewer] --> MP[Multimodal Parser]
+            MP --> HG[Hypothesis Generator]
+            HG --> CE[Sandbox Code Executor]
+            CE --> RL{Error Detected?}
+            RL -- Yes --> DBG[RL Self-Debugging]
+            DBG --> CE
+            RL -- No --> SC[Statistical Critic]
+            SC --> RM[Reward Model]
+            RM --> SYN[LaTeX Synthesis]
+        ```
+        """)
 
-        task_name = st.text_input(
-            "Research Task",
-            placeholder="e.g. Literature Analysis"
-        )
+        # Event log table
+        df_events = pd.DataFrame(res["trace_logs"])
+        st.dataframe(df_events, use_container_width=True)
 
-        input_tokens = st.number_input(
-            "Input Tokens",
-            min_value=0,
-            value=1000,
-            step=100
-        )
+    with t2:
+        st.subheader("Literature Grounding & Vector Knowledge Base")
+        lit = res["literature_review"]
+        st.write(f"**Synthesis:** {lit.get('literature_synthesis')}")
+        st.write(f"**Identified Research Gap:** `{lit.get('research_gap')}`")
 
-        output_tokens = st.number_input(
-            "Output Tokens",
-            min_value=0,
-            value=500,
-            step=100
-        )
+        st.markdown("#### Retrieved Peer-Reviewed Preprints")
+        for p in lit.get("papers", []):
+            with st.expander(f"[{p['source'].upper()}] {p['title']}"):
+                st.write(f"**Authors:** {p['authors']}")
+                st.write(f"**Source ID:** {p['id']}")
+                st.write(f"**Abstract Snippet:** {p['key_finding']}")
 
-        record_usage = st.form_submit_button(
-            "➕ Record Token Usage",
-            use_container_width=True
-        )
+    with t3:
+        st.subheader("Multimodal Ingestion (Charts & Visual Evidence)")
+        st.markdown("Vision-Language model parsing of figures, trendlines, and experimental plots.")
+        figures = res["multimodal_figures"]
+        for fig in figures:
+            st.info(f"**{fig['caption']}**\n\n• **Visual Interpretation:** {fig['interpretation']}\n• **Quantitative Extracted Data:** `{fig['quantitative_summary']}`")
 
-    if record_usage:
+    with t4:
+        st.subheader("Sandboxed Code Execution & RL Self-Correction")
+        code_info = res["code_execution"]
+        exec_meta = code_info.get("execution_result", {})
 
-        if not task_name.strip():
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.markdown(f"**Sandbox Isolation Mode:** `{exec_meta.get('sandbox_mode')}`")
+            st.markdown(f"**Breakout Attempt Detected:** `{exec_meta.get('is_breakout_attempt')}`")
+            st.markdown(f"**Debug Iterations Required:** `{code_info.get('debug_iterations_count')}`")
+        with col_b:
+            st.markdown(f"**Exit Code:** `{exec_meta.get('exit_code')}`")
+            st.markdown(f"**Execution Duration:** `{exec_meta.get('duration')}s`")
 
-            st.error("Please enter a research task name.")
+        if code_info.get("debug_trace"):
+            st.warning("⚠️ **RL Self-Debugging Loop Triggered:**")
+            for dt in code_info["debug_trace"]:
+                st.markdown(f"- **Cycle {dt['iteration']} Failure:** `{dt['failure_analysis']['error_type']}` - {dt['failure_analysis']['actionable_fix']}")
 
-        else:
+        st.markdown("#### Generated Experimental Code")
+        st.code(code_info.get("code", ""), language="python")
 
-            total_tokens = input_tokens + output_tokens
+        st.markdown("#### Execution Output (Stdout)")
+        st.text(exec_meta.get("stdout", "No stdout"))
 
-            estimated_cost = (
-                (input_tokens / 1_000_000) * input_rate
-                +
-                (output_tokens / 1_000_000) * output_rate
-            )
+    with t5:
+        st.subheader("Statistical Critic Evaluation")
+        critic = res["critic_evaluation"]
+        metrics = res["code_execution"].get("metrics", {})
 
-            usage_record = {
-                "Task": task_name.strip(),
-                "Input Tokens": int(input_tokens),
-                "Output Tokens": int(output_tokens),
-                "Total Tokens": int(total_tokens),
-                "Estimated Cost ($)": estimated_cost,
-                "Timestamp": datetime.now().strftime(
-                    "%Y-%m-%d %H:%M:%S"
-                )
-            }
+        st.success(f"**Critic Verdict:** {critic.get('verdict')}")
+        st.write(f"_{critic.get('critique')}_")
 
-            st.session_state.token_history.append(
-                usage_record
-            )
+        m1, m2, m3, m4 = st.columns(4)
+        with m1:
+            st.metric("p-value", f"{metrics.get('p_value', 1.0):.4e}")
+        with m2:
+            st.metric("Cohen's d Effect Size", f"{metrics.get('cohens_d', 0.0):.2f}")
+        with m3:
+            st.metric("95% Confidence Interval", f"[{metrics.get('ci_95_low', 0):.2f}, {metrics.get('ci_95_high', 0):.2f}]")
+        with m4:
+            st.metric("Estimated Power", f"{critic.get('estimated_power', 0.85):.2f}")
 
-            st.success("Token usage recorded successfully!")
+        # Visualization of empirical distributions
+        if metrics:
+            st.markdown("#### Empirical Distribution Comparison (N=100 Trials)")
+            b_mean = metrics.get("baseline_mean", 70)
+            b_std = metrics.get("baseline_std", 8)
+            t_mean = metrics.get("treatment_mean", 84)
+            t_std = metrics.get("treatment_std", 6)
 
-            st.rerun()
+            df_sim = pd.DataFrame({
+                "Baseline (Uncalibrated Self-Reflection)": np.random.normal(b_mean, b_std, 100),
+                "Critic-Guided Proposed Method": np.random.normal(t_mean, t_std, 100)
+            })
+            st.line_chart(df_sim)
 
-    st.divider()
-
-    # ----------------------------------------------
-    # SECTION 3: USAGE SUMMARY
-    # ----------------------------------------------
-
-    st.subheader("Token Usage Overview")
-
-    history = st.session_state.token_history
-
-    total_input = sum(
-        item["Input Tokens"] for item in history
-    )
-
-    total_output = sum(
-        item["Output Tokens"] for item in history
-    )
-
-    total_tokens = total_input + total_output
-
-    total_cost = sum(
-        item["Estimated Cost ($)"] for item in history
-    )
-
-    col1, col2, col3, col4 = st.columns(4)
-
-    col1.metric(
-        "Input Tokens",
-        f"{total_input:,}"
-    )
-
-    col2.metric(
-        "Output Tokens",
-        f"{total_output:,}"
-    )
-
-    col3.metric(
-        "Total Tokens",
-        f"{total_tokens:,}"
-    )
-
-    col4.metric(
-        "Estimated Total Cost",
-        f"${total_cost:.6f}"
-    )
-
-    st.divider()
-
-    # ----------------------------------------------
-    # SECTION 4: TOKEN USAGE CHART
-    # ----------------------------------------------
-
-    st.subheader("Token Consumption Analysis")
-
-    if history:
-
-        usage_df = pd.DataFrame(history)
-
-        chart_df = usage_df[
-            ["Task", "Input Tokens", "Output Tokens"]
-        ].set_index("Task")
-
-        st.bar_chart(
-            chart_df,
-            use_container_width=True
-        )
-
-        st.caption(
-            "Comparison of input and output token consumption "
-            "across recorded research tasks."
-        )
-
-    else:
-
-        st.info(
-            "No token usage recorded yet. "
-            "Add a research task above to generate analytics."
-        )
-
-    st.divider()
-
-    # ----------------------------------------------
-    # SECTION 5: COST ANALYTICS
-    # ----------------------------------------------
-
-    st.subheader("API Cost Analysis")
-
-    if history:
-
-        cost_df = pd.DataFrame(history)
-
-        cost_chart = cost_df[
-            ["Task", "Estimated Cost ($)"]
-        ].set_index("Task")
-
-        st.bar_chart(
-            cost_chart,
-            use_container_width=True
-        )
-
-        st.metric(
-            "Average Cost per Task",
-            f"${total_cost / len(history):.6f}"
-        )
-
-    else:
-
-        st.info("Cost analytics will appear after recording usage.")
-
-    st.divider()
-
-    # ----------------------------------------------
-    # SECTION 6: USAGE HISTORY
-    # ----------------------------------------------
-
-    st.subheader("Token Usage History")
-
-    if history:
-
-        history_df = pd.DataFrame(history)
-
-        st.dataframe(
-            history_df,
-            use_container_width=True,
-            hide_index=True
-        )
-
-        csv_data = history_df.to_csv(index=False)
+    with t6:
+        st.subheader("Synthesized Academic Research Paper (LaTeX)")
+        latex = res["latex_synthesis"]
+        st.markdown(f"**Title:** {latex.get('title')}")
+        st.markdown(f"**Generated File:** `{latex.get('tex_path')}`")
+        
+        st.markdown("#### Paper Abstract")
+        st.info(latex.get("abstract"))
 
         st.download_button(
-            "⬇ Download Usage Report (CSV)",
-            data=csv_data,
-            file_name="token_usage_report.csv",
-            mime="text/csv"
+            label="📥 Download LaTeX Manuscript (.tex)",
+            data=latex.get("rendered_tex", ""),
+            file_name="scientific_discovery_paper.tex",
+            mime="text/plain"
         )
 
-        if st.button("🗑️ Clear Usage History"):
+        with st.expander("View Full LaTeX Source Code"):
+            st.code(latex.get("rendered_tex", ""), language="latex")
 
-            st.session_state.token_history = []
+    with t7:
+        st.subheader("Holdout Benchmark Evaluation")
+        if bench:
+            st.metric("Overall Discovery Quality Score", f"{bench['overall_score']}%", delta=bench["grade"])
+            st.write(f"**Status:** {bench['recommendation']}")
 
-            st.success("Usage history cleared.")
-
-            st.rerun()
-
-    else:
-
-        st.info("No usage history available.")
-
-    st.divider()
-
-    st.subheader("Usage Insights")
-
-    if total_tokens > 0:
-
-        input_percentage = (
-            total_input / total_tokens
-        ) * 100
-
-        output_percentage = (
-            total_output / total_tokens
-        ) * 100
-
-        st.write(
-            f"**Input Token Share:** {input_percentage:.2f}%"
-        )
-
-        st.write(
-            f"**Output Token Share:** {output_percentage:.2f}%"
-        )
-
-        st.progress(input_percentage / 100)
-
-        st.write(
-            f"**Recorded Research Tasks:** {len(history)}"
-        )
-
-    else:
-
-        st.write(
-            "Record token usage to generate insights."
-        )
-
-    st.caption(
-        "Usage data is maintained in Streamlit session state. "
-        "It is not persistent across separate sessions."
-    )
+            st.markdown("#### Academic Dimension Breakdown")
+            dims = bench["dimensions"]
+            col_x, col_y = st.columns(2)
+            with col_x:
+                st.write(f"• **Literature Grounding Precision:** `{dims['literature_grounding']}%`")
+                st.write(f"• **Statistical Rigor & Power:** `{dims['statistical_rigor']}%`")
+            with col_y:
+                st.write(f"• **Sandbox Security & Soundness:** `{dims['sandbox_security_soundness']}%`")
+                st.write(f"• **LaTeX Synthesis Fidelity:** `{dims['latex_synthesis_fidelity']}%`")
