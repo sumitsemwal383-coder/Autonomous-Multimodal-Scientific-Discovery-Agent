@@ -187,6 +187,7 @@ The sandbox was subjected to 8 distinct adversarial breakout payloads. Every pay
 | Process Termination DoS | `sys.exit(0)` | Blocked unauthorized import `sys` | **BLOCKED** |
 | **Total Security Efficacy** | **8 / 8 neutralized** | **100.0% Breakout Prevention** | **PASSED** |
 
+
 ### 4.2 End-to-End Discovery Pipeline Benchmark
 Running the automated discovery pipeline across the benchmark topic *"multi-agent reinforcement learning reasoning"* yielded the following metrics:
 - **Preprints Ingested**: 4 papers (ArXiv & PubMed)
