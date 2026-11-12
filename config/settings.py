@@ -1,34 +1,42 @@
+"""Central configuration for the Autonomous Multimodal Scientific Discovery Agent."""
+
 import os
 from pathlib import Path
 
-# Base Paths
+# Project paths
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+BASE_DIR = PROJECT_ROOT
+
+# Data directories
 DATA_DIR = PROJECT_ROOT / "data"
 CACHE_DIR = DATA_DIR / "cache"
-VECTOR_STORE_DIR = DATA_DIR / "vector_store"
 HOLDOUT_DIR = DATA_DIR / "holdout_papers"
-SYNTHESIS_DIR = PROJECT_ROOT / "data" / "synthesis"
+VECTOR_STORE_DIR = DATA_DIR / "vector_store"
+SYNTHESIS_DIR = DATA_DIR / "synthesis"
 TEMPLATES_DIR = PROJECT_ROOT / "src" / "synthesis" / "templates"
 DOCKER_DIR = PROJECT_ROOT / "docker"
 
-# Create directories if not existing
-for directory in [DATA_DIR, CACHE_DIR, VECTOR_STORE_DIR, HOLDOUT_DIR, SYNTHESIS_DIR]:
+# Create required data directories
+for directory in (CACHE_DIR, HOLDOUT_DIR, VECTOR_STORE_DIR, SYNTHESIS_DIR):
     directory.mkdir(parents=True, exist_ok=True)
 
-# ArXiv & PubMed API Configuration
-ARXIV_API_URL = "http://export.arxiv.org/api/query"
+# ArXiv and PubMed API configuration
+ARXIV_API_URL = "https://export.arxiv.org/api/query"
 PUBMED_ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
 PUBMED_ESUMMARY_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
 PUBMED_EFETCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
 
-# Sandboxed Code Execution Policy
+# Sandboxed code execution policy
 SANDBOX_TIMEOUT_SECONDS = 30
 SANDBOX_MAX_MEMORY_MB = 512
-SANDBOX_ENABLE_DOCKER = os.getenv("ENABLE_DOCKER_SANDBOX", "false").lower() == "true"
+SANDBOX_ENABLE_DOCKER = (
+    os.getenv("ENABLE_DOCKER_SANDBOX", "false").strip().lower() == "true"
+)
+
 SANDBOX_DISALLOWED_IMPORTS = [
-    "os.system",
+    "os",
     "subprocess",
-    "shutil.rmtree",
+    "shutil",
     "ctypes",
     "socket",
     "requests",
@@ -41,29 +49,26 @@ SANDBOX_DISALLOWED_IMPORTS = [
     "fcntl",
     "pwd",
     "grp",
-    "sys.exit",
-    "exit",
-    "quit",
-    "builtins.__import__",
+    "sys",
 ]
 
-# Statistical Critic Configuration
+# Statistical critic configuration
 STATISTICAL_ALPHA_DEFAULT = 0.05
 STATISTICAL_CONFIDENCE_INTERVAL = 0.95
 MIN_STATISTICAL_POWER = 0.80
 EFFECT_SIZE_MODERATE_THRESHOLD = 0.50
 
-# LLM & Model Execution Settings
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "mock_heuristic")  # options: "mock_heuristic", "openai", "gemini"
+# LLM and model execution settings
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "mock_heuristic")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
-# Context Window & Memory Limits
+# Context window and memory limits
 MAX_CONTEXT_TOKENS = 8192
 SLIDING_WINDOW_HISTORY = 10
 MEMORY_SUMMARY_THRESHOLD_TOKENS = 4096
 
-# RL Feedback Loop
+# Reinforcement-learning feedback loop
 RL_MAX_DEBUG_ITERATIONS = 4
 RL_REWARD_SYNTAX_PASS = 0.25
 RL_REWARD_EXEC_PASS = 0.25
