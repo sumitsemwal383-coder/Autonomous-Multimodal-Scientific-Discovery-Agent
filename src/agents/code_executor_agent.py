@@ -8,7 +8,7 @@ from src.sandbox.execution_result import ExecutionResult
 class CodeExecutorAgent(BaseAgent):
     """Generate experiments and extract structured metrics."""
 
-    def __init__(self, sandbox: SecureSandbox):
+    def __init__(self, sandbox: SecureSandbox, feedback_loop=None):
         super().__init__(
             name="Sandbox Code Executor",
             role="Code Executor",
@@ -18,6 +18,7 @@ class CodeExecutorAgent(BaseAgent):
             ),
         )
         self.sandbox = sandbox
+        self.feedback_loop = feedback_loop
 
     def generate_experiment_code(
         self,
