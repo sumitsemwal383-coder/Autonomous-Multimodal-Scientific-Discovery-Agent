@@ -20,7 +20,7 @@ from src.agents.orchestrator import ScientificDiscoveryOrchestrator
 from src.evaluation.benchmark_evaluator import BenchmarkEvaluator
 
 st.set_page_config(
-    page_title="Zaalima AI - Autonomous Scientific Discovery Agent",
+    page_title="Autonomous Scientific Discovery Agent",
     page_icon="🔬",
     layout="wide",
     initial_sidebar_state="expanded"
