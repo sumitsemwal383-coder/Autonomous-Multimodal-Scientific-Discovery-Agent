@@ -39,8 +39,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="main-header">🔬 Autonomous Multimodal Scientific Discovery Agent</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-header">Enterprise Self-Directed AI Researcher | Zaalima Development Architecture</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header"> Autonomous Multimodal Scientific Discovery Agent</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-header">Enterprise Self-Directed AI Researcher</div>', unsafe_allow_html=True)
 
 # Sidebar Controls
 st.sidebar.image("https://img.icons8.com/color/96/artificial-intelligence.png", width=70)
@@ -76,7 +76,7 @@ if "discovery_result" not in st.session_state:
 if "bench_result" not in st.session_state:
     st.session_state["bench_result"] = None
 
-run_button = st.sidebar.button("🚀 Run Autonomous Discovery", type="primary", use_container_width=True)
+run_button = st.sidebar.button("Run Autonomous Discovery", type="primary", use_container_width=True)
 
 if run_button:
     with st.spinner("Executing end-to-end multi-agent scientific discovery cycle..."):
@@ -105,13 +105,13 @@ if res is None:
     # Overview preview
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.markdown("### 📚 1. Grounded Ingestion")
+        st.markdown("### 1. Grounded Ingestion")
         st.write("Autonomous queries to ArXiv & PubMed APIs, extracting abstracts, metadata, and indexing dense vectors into Milvus/vector database.")
     with col2:
-        st.markdown("### 🛡️ 2. Sandboxed Execution")
+        st.markdown("### 2. Sandboxed Execution")
         st.write("Code Executor synthesizes Python simulations and model training loops, running inside an AST-hardened sandbox with breakout prevention.")
     with col3:
-        st.markdown("### 📊 3. Statistical Critique & LaTeX")
+        st.markdown("### 3. Statistical Critique & LaTeX")
         st.write("Critic Agent validates p-values, 95% CIs, and Cohen's d effect sizes, producing publication-ready LaTeX manuscripts.")
 else:
     # Top Telemetry Bar
@@ -132,13 +132,13 @@ else:
 
     # Tabs for Agent Modules
     t1, t2, t3, t4, t5, t6, t7 = st.tabs([
-        "🌳 Logic Tree & Telemetry",
-        "📚 Literature & Vector Store",
-        "🖼️ Multimodal Vision",
-        "⚙️ Sandbox & Self-Debugging",
-        "📈 Statistical Critic",
-        "📄 LaTeX Research Paper",
-        "🏆 Holdout Benchmark Grade"
+        " Logic Tree & Telemetry",
+        " Literature & Vector Store",
+        " Multimodal Vision",
+        " Sandbox & Self-Debugging",
+        " Statistical Critic",
+        " LaTeX Research Paper",
+        " Holdout Benchmark Grade"
     ])
 
     with t1:
@@ -252,7 +252,7 @@ else:
         st.info(latex.get("abstract"))
 
         st.download_button(
-            label="📥 Download LaTeX Manuscript (.tex)",
+            label=" Download LaTeX Manuscript (.tex)",
             data=latex.get("rendered_tex", ""),
             file_name="scientific_discovery_paper.tex",
             mime="text/plain"
