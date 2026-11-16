@@ -1,40 +1,66 @@
 
-class MilvusAdapter:
-    """Adapter interface for a Milvus vector database."""
+"""
+Vector Database Module
+Stores and retrieves scientific research documents
+using ChromaDB.
+"""
 
-    def __init__(self, host: str = "localhost", port: str = "19530"):
-        self.host = host
-        self.port = port
-        self.connected = False
+import chromadb
+from chromadb.utils import embedding_functions
 
-    def connect(self) -> bool:
-        """Placeholder for future real Milvus connection logic."""
-        logger.info(
-            "Milvus connection requested at %s:%s",
-            self.host,
-            self.port
+
+class VectorDatabase:
+
+    def __init__(self, collection_name="scientific_research"):
+
+        self.client = chromadb.PersistentClient(
+            path="./data/chroma_db"
         )
-        # This is a placeholder, not a real connection.
-        return False
 
-
-class PineconeAdapter:
-    """Adapter interface for a Pinecone vector database."""
-
-    def __init__(
-        self,
-        api_key: str = "",
-        environment: str = "us-west1-gcp"
-    ):
-        self.api_key = api_key
-        self.environment = environment
-        self.connected = False
-
-    def init_index(self, index_name: str) -> bool:
-        """Placeholder for future real Pinecone index initialization."""
-        logger.info(
-            "Pinecone index initialization requested: %s",
-            index_name
+        self.embedding_function = (
+            embedding_functions.DefaultEmbeddingFunction()
         )
-        # This is a placeholder, not a real connection.
-        return False
+
+        self.collection = self.client.get_or_create_collection(
+            name=collection_name,
+            embedding_function=self.embedding_function
+        )
+
+    def add_documents(self, documents, ids=None):
+
+        if not documents:
+            return
+
+        if ids is None:
+            ids = [
+                f"doc_{self.collection.count() + i}"
+                for i in range(len(documents))
+            ]
+
+        self.collection.upsert(
+            documents=documents,
+            ids=ids
+        )
+
+    def search(self, query, n_results=3):
+
+        if self.collection.count() == 0:
+            return []
+
+        results = self.collection.query(
+            query_texts=[query],
+            n_results=min(n_results, self.collection.count())
+        )
+
+        return results
+
+    def clear_database(self):
+
+        self.client.delete_collection(
+            self.collection.name
+        )
+
+        self.collection = self.client.get_or_create_collection(
+            name="scientific_research",
+            embedding_function=self.embedding_function
+        )
